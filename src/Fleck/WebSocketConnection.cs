@@ -36,6 +36,7 @@ namespace Fleck
     private bool _closing;
     private bool _closed;
     private const int ReadSize = 1024 * 4;
+    private bool _canReceiving = false;
 
     public Action OnOpen { get; set; }
 
@@ -96,8 +97,17 @@ namespace Fleck
       return SendBytes(bytes);
     }
 
+    public void CanReceiving() {
+       _canReceiving = true;
+    }
+
     public void StartReceiving()
     {
+      if (!_canReceiving)
+      {
+          return;
+      }
+
       var data = new List<byte>(ReadSize);
       var buffer = new byte[ReadSize];
       Read(data, buffer);
@@ -151,9 +161,7 @@ namespace Fleck
 
       Socket.Receive(buffer, r =>
       {
-        if (r <= 0) {
-          FleckLog.Debug("0 bytes read. Closing.");
-          CloseSocket();
+        if (r == 0) {
           return;
         }
         FleckLog.Debug(r + " bytes read");
@@ -202,7 +210,7 @@ namespace Fleck
 
     private Task SendBytes(byte[] bytes, Action callback = null)
     {
-      return Socket.Send(bytes, () =>
+       Socket.Send(bytes, () =>
       {
         FleckLog.Debug("Sent " + bytes.Length + " bytes");
         if (callback != null)
@@ -216,6 +224,8 @@ namespace Fleck
           FleckLog.Info("Failed to send. Disconnecting.", e);
         CloseSocket();
       });
+
+            return null;
     }
 
     private void CloseSocket()

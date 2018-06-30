@@ -19,8 +19,6 @@ namespace Fleck
     
         private readonly Socket _socket;
         private Stream _stream;
-        private CancellationTokenSource _tokenSource;
-        private TaskFactory _taskFactory;
 
         public string RemoteIpAddress
         {
@@ -54,8 +52,6 @@ namespace Fleck
 
         public SocketWrapper(Socket socket)
         {
-            _tokenSource = new CancellationTokenSource();
-            _taskFactory = new TaskFactory(_tokenSource.Token);
             _socket = socket;
             if (_socket.Connected)
                 _stream = new NetworkStream(_socket);
@@ -119,46 +115,62 @@ namespace Fleck
             get { return _socket.LocalEndPoint; }
         }
 
-        public Task<int> Receive(byte[] buffer, Action<int> callback, Action<Exception> error, int offset)
+        public void Receive(byte[] buffer, Action<int> callback, Action<Exception> error, int offset)
         {
+            int readLength = 0;
             try
             {
-                Func<AsyncCallback, object, IAsyncResult> begin =
-               (cb, s) => _stream.BeginRead(buffer, offset, buffer.Length, cb, s);
-
-                Task<int> task = Task.Factory.FromAsync<int>(begin, _stream.EndRead, null);
-                task.ContinueWith(t => callback(t.Result), TaskContinuationOptions.NotOnFaulted)
-                    .ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
-                task.ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
-                return task;
+                bool bReadable = _socket.Poll(0, SelectMode.SelectRead);
+                if (bReadable)
+                {
+                    //此处offset默认为0，可以考虑优化_socket.Receive(m_recvBuffer, m_alreadyRecvLength, m_recvBuffer.Length - m_alreadyRecvLength,SocketFlags.None);
+                    readLength = _stream.Read(buffer,offset, buffer.Length);
+                }  
             }
             catch (Exception e)
             {
                 error(e);
-                return null;
+                return ;
             }
+
+            callback(readLength);
         }
 
-        public Task<ISocket> Accept(Action<ISocket> callback, Action<Exception> error)
+        public void Accept(Action<ISocket> callback, Action<Exception> error)
         {
-            Func<IAsyncResult, ISocket> end = r => _tokenSource.Token.IsCancellationRequested ? null : new SocketWrapper(_socket.EndAccept(r));
-            var task = _taskFactory.FromAsync(_socket.BeginAccept, end, null);
-            task.ContinueWith(t => callback(t.Result), TaskContinuationOptions.OnlyOnRanToCompletion)
-                .ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
-            task.ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
-            return task;
+            bool canAccept = false;
+            try
+            {
+                canAccept = _socket.Poll(0, SelectMode.SelectRead);
+            }
+            catch (Exception e)
+            {
+                error(e);
+                return;
+            }
+            if (canAccept)
+            {
+                Socket acceptSocket = _socket.Accept();
+                //TODO 非阻塞socket不能放到Stream里
+                //acceptSocket.Blocking = false;
+
+                //禁用TCP小包缓存Linger
+                acceptSocket.LingerState.Enabled = false;
+                acceptSocket.LingerState.LingerTime = 0;
+                SocketWrapper clientSocket = new SocketWrapper(acceptSocket);
+
+                callback(clientSocket);
+            }
         }
 
         public void Dispose()
         {
-            _tokenSource.Cancel();
             if (_stream != null) _stream.Dispose();
             if (_socket != null) _socket.Dispose();
         }
 
         public void Close()
         {
-            _tokenSource.Cancel();
             if (_stream != null) _stream.Close();
             if (_socket != null) _socket.Close();
         }
@@ -169,27 +181,30 @@ namespace Fleck
             return 0;
         }
 
-        public Task Send(byte[] buffer, Action callback, Action<Exception> error)
+        public void Send(byte[] buffer, Action callback, Action<Exception> error)
         {
-            if (_tokenSource.IsCancellationRequested)
-                return null;
 
             try
             {
-                Func<AsyncCallback, object, IAsyncResult> begin =
-                    (cb, s) => _stream.BeginWrite(buffer, 0, buffer.Length, cb, s);
+                bool bWriteAble = _socket.Poll(0, SelectMode.SelectWrite);
 
-                Task task = Task.Factory.FromAsync(begin, _stream.EndWrite, null);
-                task.ContinueWith(t => callback(), TaskContinuationOptions.NotOnFaulted)
-                    .ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
-                task.ContinueWith(t => error(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
+                if (bWriteAble)
+                {
 
-                return task;
+                    _stream.Write(buffer, 0, buffer.Length);
+                    callback();
+                }
+                else {
+                    //TODO 如果不能写，放入缓冲区
+                    error(new IOException("Socket 不能进行写操作:" + RemoteIpAddress));
+                }
+
+
             }
             catch (Exception e)
             {
                 error(e);
-                return null;
+                return;
             }
         }
     }

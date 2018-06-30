@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
@@ -30,6 +31,12 @@ namespace Fleck.Samples.ConsoleApp
                             allSockets.ToList().ForEach(s => s.Send("Echo: " + message));
                         };
                 });
+
+            while (true) {
+                server.Update();
+
+            }
+            
 
 
             var input = Console.ReadLine();
