@@ -1,6 +1,8 @@
 Fleck
 ===
 
+clone from https://github.com/statianzo/Fleck on 2018-06-30 Latest commit d9fe06c  on 1 Jun
+
 [![Build status](https://ci.appveyor.com/api/projects/status/k0s8hq5y4emak5j3/branch/master?svg=true)](https://ci.appveyor.com/project/statianzo/fleck/branch/master) [![NuGet](https://img.shields.io/nuget/v/Fleck.svg)](https://www.nuget.org/packages/Fleck/)
 
 Fleck is a WebSocket server implementation in C#. Branched from the
