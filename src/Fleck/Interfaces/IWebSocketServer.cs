@@ -7,5 +7,7 @@ namespace Fleck
         void Start(Action<IWebSocketConnection> config);
 
         void Update();
+
+        void Close(IWebSocketConnection connection);
     }
 }

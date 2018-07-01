@@ -8,8 +8,9 @@ namespace Fleck
 {
   public class WebSocketConnection : IWebSocketConnection
   {
-    public WebSocketConnection(ISocket socket, Action<IWebSocketConnection> initialize, Func<byte[], WebSocketHttpRequest> parseRequest, Func<WebSocketHttpRequest, IHandler> handlerFactory, Func<IEnumerable<string>, string> negotiateSubProtocol)
+    public WebSocketConnection(IWebSocketServer webSocketServer,ISocket socket, Action<IWebSocketConnection> initialize, Func<byte[], WebSocketHttpRequest> parseRequest, Func<WebSocketHttpRequest, IHandler> handlerFactory, Func<IEnumerable<string>, string> negotiateSubProtocol)
     {
+      _webSocketServer = webSocketServer;
       Socket = socket;
       OnOpen = () => { };
       OnClose = () => { };
@@ -29,6 +30,7 @@ namespace Fleck
     private readonly Action<IWebSocketConnection> _initialize;
     private readonly Func<WebSocketHttpRequest, IHandler> _handlerFactory;
     private readonly Func<IEnumerable<string>, string> _negotiateSubProtocol;
+    private IWebSocketServer _webSocketServer;
     readonly Func<byte[], WebSocketHttpRequest> _parseRequest;
 
     public IHandler Handler { get; set; }
@@ -115,6 +117,7 @@ namespace Fleck
 
     public void Close()
     {
+      _webSocketServer.Close(this);
       Close(WebSocketStatusCodes.NormalClosure);
     }
 

@@ -158,6 +158,7 @@ namespace Fleck
             WebSocketConnection connection = null;
 
             connection = new WebSocketConnection(
+                this,
                 clientSocket,
                 _config,
                 bytes => RequestParser.Parse(bytes, _scheme),
@@ -188,6 +189,11 @@ namespace Fleck
 
             _clientSockets.Add( connection);
 
+        }
+
+        public  void Close(IWebSocketConnection connection)
+        {
+            _clientRemoveSockets.Add((WebSocketConnection)connection);
         }
     }
 }
