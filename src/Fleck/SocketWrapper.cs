@@ -38,6 +38,14 @@ namespace Fleck
             }
         }
 
+        public Socket Socket
+        {
+            get
+            {
+                return _socket;
+            }
+        }
+
         public void SetKeepAlive(Socket socket, UInt32 keepAliveInterval, UInt32 retryInterval)
         {
             int size = sizeof(UInt32);

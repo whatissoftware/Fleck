@@ -16,6 +16,7 @@ namespace Fleck
         Stream Stream { get; }
         bool NoDelay { get; set; }
         EndPoint LocalEndPoint { get; }
+        Socket Socket { get; }
 
         void Accept(Action<ISocket> callback, Action<Exception> error);
         void Send(byte[] buffer, Action callback, Action<Exception> error);
