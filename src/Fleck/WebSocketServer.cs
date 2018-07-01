@@ -14,8 +14,8 @@ namespace Fleck
         private readonly string _scheme;
         private readonly IPAddress _locationIP;
 
-        private Dictionary<ISocket, WebSocketConnection> _clientSockets = new Dictionary<ISocket, WebSocketConnection>();
-
+        private List <WebSocketConnection> _clientSockets = new List< WebSocketConnection>();
+        private List<WebSocketConnection> _clientRemoveSockets = new List<WebSocketConnection>();
 
         public WebSocketServer(string location)
         {
@@ -104,13 +104,22 @@ namespace Fleck
         public void Update()
         {
             ListenForClients();
-
-
-
-            foreach (KeyValuePair<ISocket, WebSocketConnection> pair in _clientSockets)
+            
+            //循环触发读事件
+            foreach (WebSocketConnection webSocketConnet in _clientSockets)
             {
-                pair.Value.StartReceiving();
+                webSocketConnet.StartReceiving();
             }
+
+            foreach (WebSocketConnection webSocketConnet in _clientRemoveSockets)
+            {
+                if (_clientSockets.Contains(webSocketConnet)) {
+                    _clientSockets.Remove(webSocketConnet);
+                }
+                
+            }
+            _clientRemoveSockets.Clear();
+
         }
 
         private void ListenForClients()
@@ -154,7 +163,10 @@ namespace Fleck
                 bytes => RequestParser.Parse(bytes, _scheme),
                 r => HandlerFactory.BuildHandler(r,
                                                  s => connection.OnMessage(s),
-                                                 connection.Close,
+                                                 ()=> {
+                                                     _clientRemoveSockets.Add(connection);
+                                                     connection.Close();
+                                                 },
                                                  b => connection.OnBinary(b),
                                                  b => connection.OnPing(b),
                                                  b => connection.OnPong(b)),
@@ -174,7 +186,7 @@ namespace Fleck
                 connection.CanReceiving();
             }
 
-            _clientSockets.Add(clientSocket, connection);
+            _clientSockets.Add( connection);
 
         }
     }
